@@ -19,13 +19,17 @@ class QuickstartScript2(ScriptStrategyBase):
     # Here you can use for example the LastTrade price to use in your strategy
     price_source = PriceType.MidPrice
 
+    price_ceiling = 1700
+    price_floor = 1600
+
     markets = {exchange: {trading_pair}}
 
     def on_tick(self):
         if self.create_timestamp <= self.current_timestamp:
             self.cancel_all_orders()
             proposal: List[OrderCandidate] = self.create_proposal()
-            proposal_adjusted: List[OrderCandidate] = self.adjust_proposal_to_budget(proposal)
+            proposal_filtered = self.apply_price_ceiling_floor_filter(proposal)
+            proposal_adjusted: List[OrderCandidate] = self.adjust_proposal_to_budget(proposal_filtered)
             self.place_orders(proposal_adjusted)
             self.create_timestamp = self.order_refresh_time + self.current_timestamp
 
@@ -88,3 +92,12 @@ class QuickstartScript2(ScriptStrategyBase):
         if len(warning_lines) > 0:
             lines.extend(["", "*** WARNINGS ***"] + warning_lines)
         return "\n".join(lines)
+
+    def apply_price_ceiling_floor_filter(self, proposal):
+        proposal_filtered = []
+        for order in proposal:
+            if order.order_side == TradeType.SELL and order.price > self.price_floor:
+                proposal_filtered.append(order)
+            elif order.order_side == TradeType.BUY and order.price < self.price_ceiling:
+                proposal_filtered.append(order)
+        return proposal_filtered
