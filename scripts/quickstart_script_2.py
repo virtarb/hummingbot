@@ -63,3 +63,28 @@ class QuickstartScript2(ScriptStrategyBase):
         msg = (f"{event.trade_type.name} {round(event.amount, 2)} {event.trading_pair} {self.exchange} at {round(event.price, 2)}")
         self.log_with_clock(logging.INFO, msg)
         self.notify_hb_app_with_timestamp(msg)
+
+    def format_status(self) -> str:
+        """
+        Returns status of the current strategy on user balances and current active orders. This function is called
+        when status command is issued. Override this function to create custom status display output.
+        """
+        if not self.ready_to_trade:
+            return "Market connectors are not ready."
+        lines = []
+        warning_lines = []
+        warning_lines.extend(self.network_warning(self.get_market_trading_pair_tuples()))
+
+        balance_df = self.get_balance_df()
+        lines.extend(["", "  Balances:"] + ["    " + line for line in balance_df.to_string(index=False).split("\n")])
+
+        try:
+            df = self.active_orders_df()
+            lines.extend(["", "  Orders:"] + ["    " + line for line in df.to_string(index=False).split("\n")])
+        except ValueError:
+            lines.extend(["", "  No active maker orders."])
+
+        warning_lines.extend(self.balance_warning(self.get_market_trading_pair_tuples()))
+        if len(warning_lines) > 0:
+            lines.extend(["", "*** WARNINGS ***"] + warning_lines)
+        return "\n".join(lines)
